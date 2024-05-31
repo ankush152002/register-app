@@ -22,7 +22,7 @@ pipeline {
 
         stage("Checkout from SCM"){
                 steps {
-                    git branch: 'main', credentialsId: 'github', url: 'https://github.com/ankush152002/Cargoo'
+                    git branch: 'main', credentialsId: 'github', url: 'https://github.com/ankush152002/register-app'
                 }
         }
 
@@ -54,5 +54,5 @@ pipeline {
             }
 
        }
-    }     
+    }    
 }
