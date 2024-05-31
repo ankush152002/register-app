@@ -22,7 +22,7 @@ pipeline {
 
         stage("Checkout from SCM"){
                 steps {
-                    git branch: 'main', credentialsId: 'github', url: 'https://github.com/ankush152002/Cargoo.git'
+                    git branch: 'main', credentialsId: 'github', url: 'https://github.com/ankush152002/Cargoo'
                 }
         }
 
@@ -30,13 +30,14 @@ pipeline {
             steps {
                 sh "mvn clean package"
             }
-        }
 
-        stage("Test Application"){
+       }
+
+       stage("Test Application"){
            steps {
                  sh "mvn test"
            }
-        }
+       }
 
         stage("Build & Push Docker Image") {
             steps {
@@ -49,8 +50,9 @@ pipeline {
                         docker_image.push("${IMAGE_TAG}")
                         docker_image.push('latest')
                     }
-                  }
-               }
-        }
-    }
+                }
+            }
+
+       }
+    }     
 }
