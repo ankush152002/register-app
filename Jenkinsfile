@@ -2,48 +2,64 @@ pipeline {
     agent any
 
     environment {
-        PROJECT_ID = 'regal-hybrid-454111-r7'  // Your GCP Project ID
-        REGION = 'asia-south1'
-        REPO_NAME = 'docker-images'  // Your Artifact Registry repository name
-        IMAGE_NAME = 'asia-south1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/tomcat-webapp:latest'
+        GITHUB_TOKEN = credentials('GITHUB_TOKEN')  // Fetch GitHub Token from Jenkins
+        GCP_CREDENTIALS = credentials('gcp-service-account-key.')  // Fetch GCP Service Account Key
+        GCP_PROJECT_ID = 'regal-hybrid-454111-r7'  // Your GCP Project ID
+        ARTIFACT_REGISTRY = 'asia-south1-docker.pkg.dev/regal-hybrid-454111-r7/docker-images'
+        IMAGE_NAME = 'register-app'
+        IMAGE_TAG = "latest"
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git 'https://github.com/ankush152002/register-app.git'  // Replace with your actual GitHub repo URL
+                script {
+                    sh "git clone https://${GITHUB_TOKEN}@github.com/ankush152002/register-app.git source-code"
+                    dir("source-code") {
+                        sh "git checkout main"
+                    }
+                }
             }
         }
 
         stage('Authenticate with GCP') {
             steps {
-                withCredentials([file(credentialsId: 'gcp-service-account-key', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
-                    sh 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS'
-                    sh 'gcloud config set project $PROJECT_ID'
-                    sh 'gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet'
+                script {
+                    sh """
+                        echo '${GCP_CREDENTIALS}' > gcp-key.json
+                        gcloud auth activate-service-account --key-file=gcp-key.json
+                        gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
+                    """
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $IMAGE_NAME .'  // No need to specify Dockerfile path
+                script {
+                    sh """
+                        cd source-code
+                        docker build -t $ARTIFACT_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+                    """
+                }
             }
         }
 
         stage('Push Docker Image to Artifact Registry') {
             steps {
-                sh 'docker push $IMAGE_NAME'
+                script {
+                    sh "docker push $ARTIFACT_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+                }
             }
         }
     }
 
     post {
         success {
-            echo "✅ Image pushed successfully: $IMAGE_NAME"
+            echo "✅ Deployment Successful!"
         }
         failure {
-            echo "❌ Failed to push image!"
+            echo "❌ Deployment Failed!"
         }
     }
 }
