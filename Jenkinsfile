@@ -1,86 +1,49 @@
 pipeline {
-    agent { label 'Jenkins-Agent' }
-    tools {
-        jdk 'Java17'
-        maven 'Maven3'
-    }
+    agent any
+
     environment {
-            APP_NAME = "register-app-pipeline"
-            RELEASE = "1.0.0"
-            DOCKER_USER = "ankush152002"
-            DOCKER_PASS = 'dockerhub'
-            IMAGE_NAME = "${DOCKER_USER}" + "/" + "${APP_NAME}"
-            IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
-	    JENKINS_API_TOKEN = credentials("JENKINS_API_TOKEN")
+        PROJECT_ID = 'regal-hybrid-454111-r7'  // Your GCP Project ID
+        REGION = 'asia-south1'
+        REPO_NAME = 'docker-images'  // Your Artifact Registry repository name
+        IMAGE_NAME = 'asia-south1-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/tomcat-webapp:latest'
     }
-    stages{
-        stage("Cleanup Workspace"){
-                steps {
-                cleanWs()
-                }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git 'https://github.com/ankush152002/register-app.git'  // Replace with your actual GitHub repo URL
+            }
         }
 
-        stage("Checkout from SCM"){
-                steps {
-                    git branch: 'main', credentialsId: 'github', url: 'https://github.com/ankush152002/register-app'
+        stage('Authenticate with GCP') {
+            steps {
+                withCredentials([file(credentialsId: 'gcp-service-account-key', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                    sh 'gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS'
+                    sh 'gcloud config set project $PROJECT_ID'
+                    sh 'gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet'
                 }
+            }
         }
 
-        stage("Build Application"){
+        stage('Build Docker Image') {
             steps {
-                sh "mvn clean package"
+                sh 'docker build -t $IMAGE_NAME .'  // No need to specify Dockerfile path
             }
+        }
 
-       }
-
-       stage("Test Application"){
-           steps {
-                 sh "mvn test"
-           }
-       }
-
-        stage("Build & Push Docker Image") {
+        stage('Push Docker Image to Artifact Registry') {
             steps {
-                script {
-                    docker.withRegistry('',DOCKER_PASS) {
-                        docker_image = docker.build "${IMAGE_NAME}"
-                    }
-
-                    docker.withRegistry('',DOCKER_PASS) {
-                        docker_image.push("${IMAGE_TAG}")
-                        docker_image.push('latest')
-                    }
-                }
+                sh 'docker push $IMAGE_NAME'
             }
+        }
+    }
 
-       }
-
-        stage("Trivy Scan") {
-           steps {
-               script {
-	            sh ('docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image ankush152002/register-app-pipeline:latest --no-progress --scanners vuln  --exit-code 0 --severity HIGH,CRITICAL --format table')
-               }
-           }
-       }
-
-       stage ('Cleanup Artifacts') {
-           steps {
-               script {
-                    sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG}"
-                    sh "docker rmi ${IMAGE_NAME}:latest"
-               }
-          }
-       }
-
-       stage("Trigger CD Pipeline") {
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'JENKINS_API_TOKEN', variable: 'JENKINS_API_TOKEN')]) {
-                        sh "curl -v -k --user clouduser:${JENKINS_API_TOKEN} -X POST -H 'cache-control: no-cache' -H 'content-type: application/x-www-form-urlencoded' --data 'IMAGE_TAG=${IMAGE_TAG}' 'ec2-3-110-148-60.ap-south-1.compute.amazonaws.com:8080/job/gitops-register-app-cd/buildWithParameters?token=gitops-token'"
-                    }
-		}
-            }
-       }
-        
-    }   
+    post {
+        success {
+            echo "✅ Image pushed successfully: $IMAGE_NAME"
+        }
+        failure {
+            echo "❌ Failed to push image!"
+        }
+    }
 }
