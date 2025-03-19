@@ -14,7 +14,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 script {
-                    sh "git clone https://${GITHUB_TOKEN}@github.com/ankush152002/register-app.git source-code"
+                    sh "git clone https://${GITHUB_TOKEN}@github.com/ankush152002/register-app.git"
                     dir("source-code") {
                         sh "git checkout main"
                     }
