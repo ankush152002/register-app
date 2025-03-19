@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         GITHUB_TOKEN = credentials('GITHUB_TOKEN')  // Fetch GitHub Token from Jenkins
-        GCP_CREDENTIALS = credentials('gcp-service-account-key.')  // Fetch GCP Service Account Key
+        GCP_CREDENTIALS = credentials('gcp-service-account-key')  // Fetch GCP Service Account Key
         GCP_PROJECT_ID = 'regal-hybrid-454111-r7'  // Your GCP Project ID
         ARTIFACT_REGISTRY = 'asia-south1-docker.pkg.dev/regal-hybrid-454111-r7/docker-images'
         IMAGE_NAME = 'register-app'
