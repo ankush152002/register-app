@@ -2,8 +2,6 @@ pipeline {
     agent any
 
     environment {
-        GITHUB_TOKEN = credentials('GITHUB_TOKEN')  // Fetch GitHub Token from Jenkins
-        GCP_CREDENTIALS = credentials('gcp-service-account-key')  // Fetch GCP Service Account Key
         GCP_PROJECT_ID = 'regal-hybrid-454111-r7'  // Your GCP Project ID
         ARTIFACT_REGISTRY = 'asia-south1-docker.pkg.dev/regal-hybrid-454111-r7/docker-images'
         IMAGE_NAME = 'register-app'
@@ -14,7 +12,15 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 script {
-                    sh "git clone https://${GITHUB_TOKEN}@github.com/ankush152002/register-app.git"
+                    // Remove the directory if it exists to prevent conflicts
+                    sh "rm -rf source-code"
+                    
+                    // Clone repo securely using GitHub Token
+                    withCredentials([string(credentialsId: 'GITHUB_TOKEN', variable: 'GITHUB_TOKEN')]) {
+                        sh "git clone https://$GITHUB_TOKEN@github.com/ankush152002/register-app.git source-code"
+                    }
+
+                    // Checkout the main branch
                     dir("source-code") {
                         sh "git checkout main"
                     }
@@ -25,11 +31,12 @@ pipeline {
         stage('Authenticate with GCP') {
             steps {
                 script {
-                    sh """
-                        echo '${GCP_CREDENTIALS}' > gcp-key.json
-                        gcloud auth activate-service-account --key-file=gcp-key.json
-                        gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
-                    """
+                    withCredentials([file(credentialsId: 'gcp-service-account-key', variable: 'GCP_CREDENTIALS')]) {
+                        sh """
+                            gcloud auth activate-service-account --key-file=$GCP_CREDENTIALS
+                            gcloud auth configure-docker asia-south1-docker.pkg.dev --quiet
+                        """
+                    }
                 }
             }
         }
